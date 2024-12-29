@@ -11,71 +11,60 @@ import { Textarea } from "@/components/ui/textarea"
 import { LoaderCircle, Crop, ImageUp, Github, LoaderPinwheel, Fan } from 'lucide-react'
 
 // Image manipulations
-import { resizeCanvas, mergeMasks, maskImageCanvas, resizeAndPadBox, canvasToFloat32Array, sliceTensorMask } from "@/lib/imageutils"
+import { resizeCanvas, mergeMasks, maskImageCanvas, resizeAndPadBox, canvasToFloat32Array, maskCanvasToFloat32Array, imgTensorToCanvas, sliceTensorMask } from "@/lib/imageutils"
 
 export default function Home() {
   // resize+pad all images to 1024x1024
-  const imageSize = {w: 1024, h: 1024}
+  const imageSize = {w: 512, h: 512}
 
   // state
   const [device, setDevice] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [imageEncoded, setImageEncoded] = useState(false)
   const [status, setStatus] = useState("")
 
   // web worker, image and mask
   const samWorker = useRef(null)
   const [image, setImage] = useState(null)    // canvas
   const [mask, setMask] = useState(null)    // canvas
-  // const [imageURL, setImageURL] = useState("/image_landscape.png")
-  // const [imageURL, setImageURL] = useState("/image_portrait.png")
   const [imageURL, setImageURL] = useState("/image_portrait.png")
   const canvasEl = useRef(null)
   const fileInputEl = useRef(null)
 
   // Start encoding image
-  const encodeImageClick = async () => {
-    samWorker.current.postMessage({ type: 'encodeImage', data: canvasToFloat32Array(resizeCanvas(image, imageSize)) });   
+  const removeClick = async () => {
+    const imageCanvas = image
+    const maskCanvas = await getMaskCanvas()
 
-    setLoading(true)
-    setStatus("Encoding")
-  }
+    const {float32Array: imgArray, shape: imgArrayShape} = canvasToFloat32Array(resizeCanvas(imageCanvas, imageSize))
+    const {float32Array: maskArray, shape: maskArrayShape} = maskCanvasToFloat32Array(resizeCanvas(maskCanvas, imageSize))
 
-  // Start decoding, prompt with mouse coords
-  const imageClick = (event) => {
-    if (!imageEncoded) return;
-
-    const canvas = canvasEl.current
-    const rect = event.target.getBoundingClientRect();
-
-    // input image will be resized to 1024x1024 -> normalize mouse pos to 1024x1024
-    const point = {
-      x: (event.clientX - rect.left) / canvas.width * imageSize.w,
-      y: (event.clientY - rect.top) / canvas.height * imageSize.h,
-      label: 1
-    }
-
-    samWorker.current.postMessage({ type: 'decodeMask', data: point });  
-
-    setLoading(true)
-    setStatus("Decoding")
-  }
-
-  // Decoding finished -> parse result and update mask
-  const handleDecodingResults = (decodingResults) => {
-    // SAM2 returns 3 mask along with scores -> select best one    
-    const maskTensors = decodingResults.masks
-    const maskScores = decodingResults.iou_predictions.cpuData
-    const bestMaskIdx = maskScores.indexOf(Math.max(...maskScores))
-    const maskCanvas = sliceTensorMask(maskTensors, bestMaskIdx)    
-
-    setMask((prevMask) => {
-      if (prevMask) {
-        return mergeMasks(maskCanvas, prevMask)
-      } else {
-        return resizeCanvas(maskCanvas, imageSize)
+    samWorker.current.postMessage({ 
+      type: 'runRemove', 
+      data: {
+        imgArray: imgArray,
+        imgArrayShape: imgArrayShape,
+        maskArray: maskArray,
+        maskArrayShape: maskArrayShape, 
       }
-    })
+    });   
+
+    setLoading(true)
+    setStatus("Removing")
+  }
+
+
+  async function getMaskCanvas() {
+    const img = new Image();
+    img.src = "/image_portrait_mask2.png"
+    await img.decode()
+
+    const canvas = document.createElement("canvas")
+    canvas.height=img.naturalHeight
+    canvas.width=img.naturalWidth
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, canvas.width, canvas.height);      
+
+    return canvas
   }
 
   // Handle web worker messages
@@ -95,28 +84,19 @@ export default function Home() {
     } else if (type == "downloadInProgress" || type == "loadingInProgress") {
       setLoading(true)
       setStatus("Loading model")
-    } else if (type == "encodeImageDone" ) {
-      // alert(data.durationMs)
-      setImageEncoded(true)
+    } else if (type == "removeDone") {
+      const imgTensor = data
+      const imgCanvas = imgTensorToCanvas(imgTensor)
+
+      const canvas = canvasEl.current
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(imgCanvas, 0, 0, imgCanvas.width, imgCanvas.height, 0, 0, canvas.width, canvas.height);      
+
       setLoading(false)
-      setStatus("Ready. Click on image")
-    } else if (type == "decodeMaskResult" ) {
-      handleDecodingResults(data) 
-      setLoading(false)
-      setStatus("Ready. Click on image")
     }
   }
 
-  // Crop image with mask
-  const cropClick = (event) => {
-    const link = document.createElement("a");
-    link.href = maskImageCanvas(image, mask).toDataURL();
-    link.download = "crop.png";
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
 
   // Upload new image
   const handleFileUpload = (e) => {
@@ -125,7 +105,6 @@ export default function Home() {
 
     setImage(null)
     setMask(null)
-    setImageEncoded(false)
     setStatus("Encode image")
     setImageURL(dataURL)
   }
@@ -139,7 +118,7 @@ export default function Home() {
 
       setLoading(true)
     }
-  }, [onWorkerMessage, handleDecodingResults])
+  }, [onWorkerMessage])
 
   // Load image, pad to square and store in offscreen canvas
   useEffect(() => {
@@ -170,35 +149,23 @@ export default function Home() {
     }
   }, [image]);
 
-  // Mask changed, draw original image and mask on top with some alpha
-  useEffect(() => {
-    if (mask) {
-      const canvas = canvasEl.current
-      const ctx = canvas.getContext('2d')
-
-      ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, canvas.width, canvas.height);      
-      ctx.globalAlpha = 0.4
-      ctx.drawImage(mask, 0, 0, mask.width, mask.height, 0, 0, canvas.width, canvas.height);      
-      ctx.globalAlpha = 1;
-    }
-  }, [mask, image])
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background p-4">
       <Card className="w-full max-w-2xl">
         <div className="absolute top-4 right-4">
-          <Button
+{/*          <Button
             variant="outline"
             size="sm"
             onClick={() => window.open('https://github.com/geronimi73/next-sam', '_blank')}
           >
             <Github className="w-4 h-4 mr-2" />
             View on GitHub
-          </Button>
+          </Button>*/}
         </div>
         <CardHeader>
           <CardTitle>
-            <p>Clientside Image Segmentation with onnxruntime-web and Meta's SAM2
+            <p>Clientside Object Removal with onnxruntime-web and <a href="https://github.com/advimman/lama">LaMa</a>
             </p>
             <p className={cn("flex gap-1 items-center", device ? "visible" : "invisible")}>
               <Fan color="#000" className="w-6 h-6 animate-[spin_2.5s_linear_infinite] direction-reverse"/>
@@ -209,19 +176,22 @@ export default function Home() {
         <CardContent>
           <div className="flex flex-col gap-4">
             <div className="flex justify-between gap-4">
-              <Button onClick={encodeImageClick} disabled={loading || imageEncoded}>
-                <p className="flex items-center gap-2">
-                  { loading && <LoaderCircle className="animate-spin w-6 h-6" /> }
-                  {status}
-                </p>
+{/*              <Button onClick={removeClick}>
+                Remove da ship
+              </Button>*/}
+              <Button onClick={removeClick} disabled={loading}>
+                  { loading 
+                    ? <p className="flex items-center gap-2">
+                      <LoaderCircle className="animate-spin w-6 h-6" /> 
+                      {status}
+                    </p>
+                    : <p>Remove da ship</p>
+                  }
               </Button>
-              { mask &&
-                <Button onClick={cropClick} variant="secondary"><Crop/> Crop</Button>
-              }
               <Button onClick={()=>{fileInputEl.current.click()}} variant="secondary" disabled={loading}><ImageUp/> Change image</Button>
             </div>
             <div className="flex justify-center">
-              <canvas ref={canvasEl} width={512} height={512} onClick={imageClick}/>
+              <canvas ref={canvasEl} width={512} height={512}/>
             </div>
           </div>
         </CardContent>

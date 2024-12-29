@@ -7,9 +7,10 @@ import * as ort from 'onnxruntime-web/all';
 
 const LAMA_URL = "/lama_fp32.onnx"
 
-export class SAM2 {
+export class LAMA {
   modelBuffer = null
   modelSession = null
+  modelEp = null
   image_encoded = null
 
   constructor() { }
@@ -79,40 +80,31 @@ export class SAM2 {
      *  seems to be related to web worker, see https://github.com/microsoft/onnxruntime/issues/22113
      *  => loop through each ep, catch e if not available and move on
      */
-    let session = null
-    for (let ep of ["webgpu", "cpu"]) {
-      try { session = await ort.InferenceSession.create(this.modelBuffer, { executionProviders: [ep]}) }
-      catch (e) { console.error(e); continue }
-
-      return [session, ep]
+    if (!this.modelSession) {
+      // for (let ep of ["webgpu", "cpu"]) {
+      for (let ep of ["cpu"]) {
+        try { 
+          // console.log("loading model on", ep)
+          this.modelSession = await ort.InferenceSession.create(this.modelBuffer, { executionProviders: [ep]})
+          this.modelEp = ep 
+          break
+        }
+        catch (e) { console.error(e); continue }
+      }      
     }
+    return [this.modelSession, this.modelEp]
   }
 
-  // async encodeImage(inputTensor) {
-  //   const [session, device] = await this.getEncoderSession()
-  //   const results = await session.run({image: inputTensor});
+  async removeArea(imageTensor, maskTensor) {
+    const [session, device] = await this.getORTSession()
+    const results = await session.run({
+      image: imageTensor,
+      mask: maskTensor,
+    });
 
-  //   this.image_encoded = {
-  //     high_res_feats_0: results[session.outputNames[0]],
-  //     high_res_feats_1: results[session.outputNames[1]],
-  //     image_embed: results[session.outputNames[2]]
-  //   }
-  // }
+    console.log(results)
 
-  // async decode(point) {
-  //   const [session, device] = await this.getORTSession()
+    return results
+  }
 
-  //   const inputs = {
-  //     image_embed: this.image_encoded.image_embed, 
-  //     high_res_feats_0: this.image_encoded.high_res_feats_0, 
-  //     high_res_feats_1: this.image_encoded.high_res_feats_1,
-  //     point_coords: new ort.Tensor("float32", [point.x, point.y], [1, 1, 2]), 
-  //     point_labels: new ort.Tensor("float32", [point.label], [1, 1]), 
-  //     mask_input: new ort.Tensor("float32", new Float32Array(256 * 256), [1, 1, 256, 256]), 
-  //     has_mask_input: new ort.Tensor("float32", [0], [1]), 
-  //     orig_im_size: new ort.Tensor("int32", [1024, 1024], [2])
-  //   }
-
-  //   return await session.run(inputs);
-  // }
 }

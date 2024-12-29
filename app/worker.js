@@ -1,37 +1,38 @@
-import { SAM2 } from "./lama"
+import { LAMA } from "./lama"
 import { Tensor } from 'onnxruntime-web';
 
-const sam = new SAM2()
+const lama = new LAMA()
 
 self.onmessage = async (e) => {
-  // console.log("worker received message")
+  console.log("worker received message", e.data)
 
   const { type, data } = e.data;
 
   if (type === 'ping') {
     self.postMessage({ type: 'downloadInProgress' })
-    await sam.downloadModels()
+    await lama.downloadModels()
 
     self.postMessage({ type: 'loadingInProgress' })
-    const report = await sam.createSessions()
+    const report = await lama.createSessions()
 
     self.postMessage({ type: 'pong', data: report })
 
-  // } else if (type === 'encodeImage') {
-  //   const {float32Array, shape} = data
-  //   const imgTensor = new Tensor("float32", float32Array, shape);
+  } else if (type === 'runRemove') {
+    const {imgArray, imgArrayShape, maskArray, maskArrayShape} = data
 
-  //   const startTime = performance.now();
-  //   await sam.encodeImage(imgTensor)
-  //   const durationMs = performance.now() - startTime;
+    const imgTensor = new Tensor("float32", imgArray, imgArrayShape);
+    const maskTensor = new Tensor("float32", maskArray, maskArrayShape);
 
-  //   self.postMessage({ type: 'encodeImageDone', data: {durationMs: durationMs} })
+    const result = await lama.removeArea(imgTensor, maskTensor)
 
-  // } else if (type === 'decodeMask') {
-  //   const point = data
-  //   const decodingResults = await sam.decode(point) // decodingResults = Tensor [B=1, Masks, W, H]
+    // reshape result [1, 3, w, h] -> [w, h, 3]
+    let resultTensor = result.output
+    // const [tmp1,colors,width,height] = resultTensor.dims
+    // resultTensor = resultTensor.reshape([width, height, colors])
+    // resultTensor = resultTensor.transpose([width, height, colors])
 
-  //   self.postMessage({ type: 'decodeMaskResult', data: decodingResults })
+    // result.output is the 
+    self.postMessage({ type: 'removeDone', data: resultTensor })
 
   } else {
     throw new Error(`Unknown message type: ${type}`);
