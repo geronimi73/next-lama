@@ -29,7 +29,7 @@ export default function Home() {
   const [mask, setMask] = useState(null)    // canvas
   // const [imageURL, setImageURL] = useState("/image_landscape.png")
   // const [imageURL, setImageURL] = useState("/image_portrait.png")
-  const [imageURL, setImageURL] = useState("/image_square.png")
+  const [imageURL, setImageURL] = useState("/image_portrait.png")
   const canvasEl = useRef(null)
   const fileInputEl = useRef(null)
 

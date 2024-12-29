@@ -1,4 +1,4 @@
-import { SAM2 } from "./SAM2"
+import { SAM2 } from "./lama"
 import { Tensor } from 'onnxruntime-web';
 
 const sam = new SAM2()
@@ -17,21 +17,21 @@ self.onmessage = async (e) => {
 
     self.postMessage({ type: 'pong', data: report })
 
-  } else if (type === 'encodeImage') {
-    const {float32Array, shape} = data
-    const imgTensor = new Tensor("float32", float32Array, shape);
+  // } else if (type === 'encodeImage') {
+  //   const {float32Array, shape} = data
+  //   const imgTensor = new Tensor("float32", float32Array, shape);
 
-    const startTime = performance.now();
-    await sam.encodeImage(imgTensor)
-    const durationMs = performance.now() - startTime;
+  //   const startTime = performance.now();
+  //   await sam.encodeImage(imgTensor)
+  //   const durationMs = performance.now() - startTime;
 
-    self.postMessage({ type: 'encodeImageDone', data: {durationMs: durationMs} })
+  //   self.postMessage({ type: 'encodeImageDone', data: {durationMs: durationMs} })
 
-  } else if (type === 'decodeMask') {
-    const point = data
-    const decodingResults = await sam.decode(point) // decodingResults = Tensor [B=1, Masks, W, H]
+  // } else if (type === 'decodeMask') {
+  //   const point = data
+  //   const decodingResults = await sam.decode(point) // decodingResults = Tensor [B=1, Masks, W, H]
 
-    self.postMessage({ type: 'decodeMaskResult', data: decodingResults })
+  //   self.postMessage({ type: 'decodeMaskResult', data: decodingResults })
 
   } else {
     throw new Error(`Unknown message type: ${type}`);

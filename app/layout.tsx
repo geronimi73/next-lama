@@ -3,7 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Next/SAM2",
+  title: "Next/LaMa",
 };
 
 export default function RootLayout({
