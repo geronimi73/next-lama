@@ -26,6 +26,8 @@ export default function Home() {
   const lamaWorker = useRef(null)
   const [image, setImage] = useState(null)    // canvas
   const [mask, setMask] = useState(null)    // canvas
+  const [mousedown, setMousedown] = useState(false)    
+  const [diddrag, setDiddrag] = useState(false)    
   const [imageURL, setImageURL] = useState("/image_portrait.png")
   const canvasEl = useRef(null)
   const fileInputEl = useRef(null)
@@ -52,7 +54,7 @@ export default function Home() {
     setStatus("Removing")
   }
 
-  function canvasClick(evt) {
+  function canvasDrag(evt) {
     if (loading) return
 
     const rect = canvasEl.current.getBoundingClientRect();
@@ -69,6 +71,10 @@ export default function Home() {
     maskCtx.fill();
 
     updateCanvas()
+  }
+
+  function canvasDragStop(evt) {
+    removeClick()
   }
 
   // redraw visible canvas, overlay with mask 
@@ -214,7 +220,13 @@ export default function Home() {
               <Button onClick={()=>{fileInputEl.current.click()}} variant="secondary" disabled={loading}><ImageUp/> Change image</Button>
             </div>
             <div className="flex justify-center">
-              <canvas className="max-h-[500px] max-w-[500px]" onClick={canvasClick} ref={canvasEl}/ >
+              <canvas 
+                className="max-h-[500px] max-w-[500px]" 
+                onMouseDown={(e)=>{setMousedown(true);canvasDrag(e)}} 
+                onMouseUp={(e)=>{setMousedown(false);if(mousedown) canvasDragStop(e)}} 
+                onMouseMove={(e)=>{if(mousedown) canvasDrag(e)}}
+
+                ref={canvasEl}/ >
             </div>
           </div>
         </CardContent>
