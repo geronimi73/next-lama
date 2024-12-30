@@ -207,17 +207,14 @@ export default function Home() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
-            <div className="flex justify-between gap-4">
-              <Button onClick={removeClick} disabled={loading}>
-                  { loading 
-                    ? <p className="flex items-center gap-2">
-                      <LoaderCircle className="animate-spin w-6 h-6" /> 
-                      {status}
-                    </p>
-                    : <p>Remove da ship</p>
-                  }
-              </Button>
-              <Button onClick={()=>{fileInputEl.current.click()}} variant="secondary" disabled={loading}><ImageUp/> Change image</Button>
+            <div className="flex justify-center gap-4 h-10">
+              { loading 
+                ? <p className="flex items-center gap-2">
+                  <LoaderCircle className="animate-spin w-6 h-6" /> 
+                  {status}
+                </p>
+                : <Button onClick={()=>{fileInputEl.current.click()}} variant="secondary" disabled={loading}><ImageUp/> Change image</Button>
+              }
             </div>
             <div className="flex justify-center">
               <canvas 
