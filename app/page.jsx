@@ -59,8 +59,8 @@ export default function Home() {
 
     const rect = canvasEl.current.getBoundingClientRect();
     const pos = {
-      x: (evt.clientX - window.pageXOffset - rect.left) / rect.width * canvasEl.current.width,
-      y: (evt.clientY - window.pageYOffset - rect.top) / rect.height * canvasEl.current.height,
+      x: (evt.clientX - rect.left) / rect.width * canvasEl.current.width,
+      y: (evt.clientY - rect.top) / rect.height * canvasEl.current.height,
     }
 
     // Add circle to mask
