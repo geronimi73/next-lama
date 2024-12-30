@@ -1,11 +1,11 @@
 import path from 'path';
 
 import * as ort from 'onnxruntime-web/all';
-// ort.env.wasm.numThreads=1
+// ort.env.wasm.numThreads=0
 // ort.env.wasm.simd = false;
 
-
-const LAMA_URL = "/lama_fp32.onnx"
+// const LAMA_URL = "/lama_fp32.onnx"
+const LAMA_URL = "https://huggingface.co/g-ronimo/lama/resolve/main/lama_fp32.onnx"
 
 export class LAMA {
   modelBuffer = null

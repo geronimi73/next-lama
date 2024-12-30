@@ -25,14 +25,8 @@ self.onmessage = async (e) => {
 
     const result = await lama.removeArea(imgTensor, maskTensor)
 
-    // reshape result [1, 3, w, h] -> [w, h, 3]
-    let resultTensor = result.output
-    // const [tmp1,colors,width,height] = resultTensor.dims
-    // resultTensor = resultTensor.reshape([width, height, colors])
-    // resultTensor = resultTensor.transpose([width, height, colors])
-
     // result.output is the 
-    self.postMessage({ type: 'removeDone', data: resultTensor })
+    self.postMessage({ type: 'removeDone', data: result.output })
 
   } else {
     throw new Error(`Unknown message type: ${type}`);

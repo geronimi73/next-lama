@@ -23,7 +23,7 @@ export default function Home() {
   const [status, setStatus] = useState("")
 
   // web worker, image and mask
-  const samWorker = useRef(null)
+  const lamaWorker = useRef(null)
   const [image, setImage] = useState(null)    // canvas
   const [mask, setMask] = useState(null)    // canvas
   const [imageURL, setImageURL] = useState("/image_portrait.png")
@@ -33,12 +33,12 @@ export default function Home() {
   // Start encoding image
   const removeClick = async () => {
     const imageCanvas = image
-    const maskCanvas = await getMaskCanvas()
+    const maskCanvas = mask
 
     const {float32Array: imgArray, shape: imgArrayShape} = canvasToFloat32Array(resizeCanvas(imageCanvas, imageSize))
     const {float32Array: maskArray, shape: maskArrayShape} = maskCanvasToFloat32Array(resizeCanvas(maskCanvas, imageSize))
 
-    samWorker.current.postMessage({ 
+    lamaWorker.current.postMessage({ 
       type: 'runRemove', 
       data: {
         imgArray: imgArray,
@@ -52,23 +52,44 @@ export default function Home() {
     setStatus("Removing")
   }
 
+  function canvasClick(evt) {
+    if (loading) return
 
-  async function getMaskCanvas() {
-    const img = new Image();
-    img.src = "/image_portrait_mask2.png"
-    await img.decode()
+    const rect = canvasEl.current.getBoundingClientRect();
+    const pos = {
+      x: (evt.clientX - window.pageXOffset - rect.left) / rect.width * canvasEl.current.width,
+      y: (evt.clientY - window.pageYOffset - rect.top) / rect.height * canvasEl.current.height,
+    }
 
-    const canvas = document.createElement("canvas")
-    canvas.height=img.naturalHeight
-    canvas.width=img.naturalWidth
+    // Add circle to mask
+    const maskCtx = mask.getContext('2d');
+    maskCtx.fillStyle=`rgba(237, 25, 233, 1)`
+    maskCtx.beginPath();
+    maskCtx.arc(pos.x, pos.y, 50, 0, 4 * Math.PI);      
+    maskCtx.fill();
+
+    updateCanvas()
+  }
+
+  // redraw visible canvas, overlay with mask 
+  function updateCanvas() {
+    const canvas = canvasEl.current
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, canvas.width, canvas.height);      
+    ctx.save()
+    canvas.height=image.height
+    canvas.width=image.width
 
-    return canvas
+    ctx.drawImage(image, 0, 0);      
+    if (mask) {
+      ctx.globalAlpha = 0.3
+      ctx.drawImage(mask, 0, 0);            
+    }
+    ctx.restore()
+
   }
 
   // Handle web worker messages
-  const onWorkerMessage = (event) => {
+  function onWorkerMessage (event) {
     const {type, data} = event.data
 
     if (type == "pong" ) {
@@ -86,12 +107,11 @@ export default function Home() {
       setStatus("Loading model")
     } else if (type == "removeDone") {
       const imgTensor = data
-      const imgCanvas = imgTensorToCanvas(imgTensor)
+      let imgCanvas = imgTensorToCanvas(imgTensor)
 
-      const canvas = canvasEl.current
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(imgCanvas, 0, 0, imgCanvas.width, imgCanvas.height, 0, 0, canvas.width, canvas.height);      
+      setImage((prevImage) => {
+        return resizeCanvas(imgCanvas, {w: prevImage.width, h: prevImage.height})
+      })
 
       setLoading(false)
     }
@@ -104,64 +124,70 @@ export default function Home() {
     const dataURL = window.URL.createObjectURL(file)
 
     setImage(null)
-    setMask(null)
     setStatus("Encode image")
     setImageURL(dataURL)
   }
 
   // Load web worker 
   useEffect(() => {
-    if (!samWorker.current) {
-      samWorker.current = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
-      samWorker.current.addEventListener('message', onWorkerMessage)
-      samWorker.current.postMessage({ type: 'ping' });   
+    if (!lamaWorker.current) {
+      lamaWorker.current = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+      lamaWorker.current.addEventListener('message', onWorkerMessage)
+      lamaWorker.current.postMessage({ type: 'ping' });   
 
       setLoading(true)
     }
-  }, [onWorkerMessage])
+  }, [onWorkerMessage, image])
 
-  // Load image, pad to square and store in offscreen canvas
+  // Load image, store in offscreen canvas
   useEffect(() => {
     if (imageURL) {
       const img = new Image();
       img.src = imageURL
       img.onload = function() {
-        const largestDim = img.naturalWidth > img.naturalHeight ? img.naturalWidth : img.naturalHeight
-        const box = resizeAndPadBox({h: img.naturalHeight, w: img.naturalWidth}, {h: largestDim, w: largestDim})
+        // draw image onto offscreen canvas
+        let canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth
+        canvas.height = img.naturalHeight
 
-        const canvas = document.createElement('canvas');
-        canvas.width = largestDim
-        canvas.height = largestDim
-
-        canvas.getContext('2d').drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, box.x, box.y, box.w, box.h)
+        canvas.getContext('2d').drawImage(img, 0, 0) //, img.naturalWidth, img.naturalHeight, box.x, box.y, box.w, box.h)
         setImage(canvas)
+
       }
     }
   }, [imageURL]);
 
-  // Offscreen canvas changed, draw it 
   useEffect(() => {
     if (image) {
-      const canvas = canvasEl.current
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, canvas.width, canvas.height);      
+      // new image -> update mask (-> new mask -> updateCanvas)
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width
+      canvas.height = image.height
+
+      setMask(canvas)
     }
   }, [image]);
+
+  useEffect(() => {
+    if (image) {
+      updateCanvas()
+    }
+  }, [mask]);
 
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background p-4">
       <Card className="w-full max-w-2xl">
         <div className="absolute top-4 right-4">
-{/*          <Button
+          <Button
             variant="outline"
             size="sm"
-            onClick={() => window.open('https://github.com/geronimi73/next-sam', '_blank')}
+            disabled={true}
+            // onClick={() => window.open('https://github.com/geronimi73/next-sam', '_blank')}
           >
             <Github className="w-4 h-4 mr-2" />
             View on GitHub
-          </Button>*/}
+          </Button>
         </div>
         <CardHeader>
           <CardTitle>
@@ -176,9 +202,6 @@ export default function Home() {
         <CardContent>
           <div className="flex flex-col gap-4">
             <div className="flex justify-between gap-4">
-{/*              <Button onClick={removeClick}>
-                Remove da ship
-              </Button>*/}
               <Button onClick={removeClick} disabled={loading}>
                   { loading 
                     ? <p className="flex items-center gap-2">
@@ -191,7 +214,7 @@ export default function Home() {
               <Button onClick={()=>{fileInputEl.current.click()}} variant="secondary" disabled={loading}><ImageUp/> Change image</Button>
             </div>
             <div className="flex justify-center">
-              <canvas ref={canvasEl} width={512} height={512}/>
+              <canvas className="max-h-[500px] max-w-[500px]" onClick={canvasClick} ref={canvasEl}/ >
             </div>
           </div>
         </CardContent>
