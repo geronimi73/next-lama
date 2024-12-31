@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { LoaderCircle, Crop, ImageUp, Github, LoaderPinwheel, Fan } from 'lucide-react'
+import { LoaderCircle, Crop, ImageUp, Github, LoaderPinwheel, Fan, Download } from 'lucide-react'
 
 // Image manipulations
 import { resizeCanvas, mergeMasks, maskImageCanvas, resizeAndPadBox, canvasToFloat32Array, maskCanvasToFloat32Array, imgTensorToCanvas, sliceTensorMask } from "@/lib/imageutils"
@@ -123,7 +123,6 @@ export default function Home() {
     }
   }
 
-
   // Upload new image
   const handleFileUpload = (e) => {
     const file = e.target.files[0]
@@ -132,6 +131,16 @@ export default function Home() {
     setImage(null)
     setStatus("Encode image")
     setImageURL(dataURL)
+  }
+
+  const downloadClick = (event) => {
+    const link = document.createElement("a");
+    link.href = image.toDataURL();
+    link.download = "montage.png";
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   // Load web worker 
@@ -213,7 +222,10 @@ export default function Home() {
                   <LoaderCircle className="animate-spin w-6 h-6" /> 
                   {status}
                 </p>
-                : <Button onClick={()=>{fileInputEl.current.click()}} variant="secondary" disabled={loading}><ImageUp/> Change image</Button>
+                : <div className="flex space-between gap-2">
+                    <Button onClick={()=>{fileInputEl.current.click()}} variant="secondary" disabled={loading}><ImageUp/> Change image</Button>
+                    <Button onClick={downloadClick} variant="secondary" disabled={loading}><Download /> </Button>
+                  </div>
               }
             </div>
             <div className="flex justify-center">
