@@ -220,6 +220,7 @@ export default function Home() {
               <canvas 
                 className="max-h-[500px] max-w-[500px]" 
                 onMouseDown={(e)=>{setMousedown(true);canvasDrag(e)}} 
+                onMouseLeave={(e)=>{setMousedown(false)}} 
                 onMouseUp={(e)=>{setMousedown(false);if(mousedown) canvasDragStop(e)}} 
                 onMouseMove={(e)=>{if(mousedown) canvasDrag(e)}}
 
