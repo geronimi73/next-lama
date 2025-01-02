@@ -1,8 +1,9 @@
 import path from 'path';
 
-import * as ort from 'onnxruntime-web/all';
+import * as ort from '../public/ort.webgpu.mjs';
 // ort.env.wasm.numThreads=0
 // ort.env.wasm.simd = false;
+ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
 
 // const LAMA_URL = "/lama_fp32.onnx"
 const LAMA_URL = "https://huggingface.co/g-ronimo/lama/resolve/main/lama_fp32.onnx"
@@ -81,8 +82,8 @@ export class LAMA {
      *  => loop through each ep, catch e if not available and move on
      */
     if (!this.modelSession) {
-      // for (let ep of ["webgpu", "cpu"]) {
-      for (let ep of ["cpu"]) {
+      // for (let ep of ["cpu"]) {
+      for (let ep of ["webgpu", "cpu"]) {
         try { 
           // console.log("loading model on", ep)
           this.modelSession = await ort.InferenceSession.create(this.modelBuffer, { executionProviders: [ep]})
