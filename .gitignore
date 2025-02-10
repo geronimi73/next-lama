@@ -4,3 +4,7 @@ app/.DS_Store
 /.next
 /node_modules
 public/lama_fp32.onnx
+public/lama.onnx
+/public/archive
+*.ort
+public/ort.webgpu.mjs.archive

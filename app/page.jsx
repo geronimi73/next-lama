@@ -197,8 +197,7 @@ export default function Home() {
           <Button
             variant="outline"
             size="sm"
-            disabled={true}
-            // onClick={() => window.open('https://github.com/geronimi73/next-sam', '_blank')}
+            onClick={() => window.open('https://github.com/geronimi73/next-lama', '_blank')}
           >
             <Github className="w-4 h-4 mr-2" />
             View on GitHub
